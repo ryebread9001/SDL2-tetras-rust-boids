@@ -4,12 +4,13 @@ use tetra::math::Vec2;
 use tetra::Context;
 use rand::rngs::ThreadRng;
 use rand::{self, Rng};
-use super::{Queue, POSITION_BUFFER_SIZE};
+use super::POSITION_BUFFER_SIZE;
+use super::queue::Queue;
 
 #[derive(Debug, Clone)]
 
 enum BatState {
-    Chase,
+    Debug,
     Boid,
 }
 #[derive(Debug, Clone)]
@@ -19,15 +20,12 @@ pub struct Enemy {
     position: Vec2<f32>,
     velocity: Vec2<f32>,
     dimension: Vec2<f32>,
-    dest_ind: usize,
     is_facing_left: bool,
     state: BatState,
     debug: bool,
     boids_center: Vec2<f32>,
     visual_range: f32
 }
-
-
 
 impl Enemy {
     pub fn new(id: u16, ts: Vec<Texture>, dim: Vec2<f32>, rng: &mut ThreadRng, visual_range: f32, debug: bool) -> Enemy {
@@ -40,7 +38,6 @@ impl Enemy {
             position: Vec2::new(x_pos,y_pos),
             velocity: Vec2::new(0.0,0.0),
             dimension: dim,
-            dest_ind: rng.gen_range(0..POSITION_BUFFER_SIZE),
             is_facing_left: true,
             state: BatState::Boid,
             debug,
@@ -53,33 +50,23 @@ impl Enemy {
         self.position
     }
 
+    pub fn get_dim(&self) -> Vec2<f32> {
+        self.dimension
+    }
+
     pub fn get_vel(&self) -> Vec2<f32> {
         self.velocity
     }
 
-    pub fn set_state(&mut self, is_chase: bool) {
-        if is_chase {
-            self.state = BatState::Chase;
+    pub fn set_state(&mut self, debug: bool) {
+        if debug {
+            self.state = BatState::Debug;
         } else {
             self.state = BatState::Boid;
         }
     }
 
-    fn oldest_player_pos(&self, player_pos_buf: &Queue<Vec2<f32>>) -> Vec2<f32> {
-        if self.dest_ind <= POSITION_BUFFER_SIZE - 1 {
-            if let Some(&oldest_player_pos) = player_pos_buf.get_at(self.dest_ind) {
-                oldest_player_pos
-            } else {
-                Vec2::new(0.0,0.0)
-            }
-        } else {
-            Vec2::new(0.0,0.0)
-        }
-    }
-
-    fn chase_player(&self, player_pos_buf: &Queue<Vec2<f32>>)  -> Vec2<f32> {
-        self.oldest_player_pos(player_pos_buf) - self.position
-    }
+    
 
     fn rule1(&self) -> Vec2<f32> {
         (self.boids_center - self.position) * 0.005
@@ -142,9 +129,8 @@ impl Enemy {
         result
     }
 
-    fn boids_towards_player(&self, player_pos_buf: &Queue<Vec2<f32>>) -> Vec2<f32> {
-        let player_pos = self.oldest_player_pos(player_pos_buf);
-        let factor = 0.005;
+    fn boids_towards_player(&self, player_pos: Vec2<f32>) -> Vec2<f32> {
+        let factor = 0.0065;
         let distance_to_player = self.distance(&player_pos);
         if distance_to_player < self.visual_range {
             (player_pos - self.position) * factor
@@ -172,7 +158,7 @@ impl Enemy {
         // }
     }
 
-    fn boid(&mut self, player_pos_buf: &Queue<Vec2<f32>>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) -> Vec2<f32> {
+    fn boid(&mut self, player_pos_buf: Vec2<f32>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) -> Vec2<f32> {
         let boids_seen = self.boids_in_range(boids_pos);
         self.calculate_center(&boids_seen);
         let mut new_vel: Vec2<f32> = Vec2 { x: (0.0), y: (0.0) };
@@ -194,16 +180,16 @@ impl Enemy {
 
     pub fn toggle_state(&mut self) {
         match self.state {
-            BatState::Chase => {self.state = BatState::Boid;
+            BatState::Debug => {self.state = BatState::Boid;
             self.velocity.x *= 10.74; self.velocity.y *= 10.5;},
-            BatState::Boid => self.state = BatState::Chase,
+            BatState::Boid => self.state = BatState::Debug,
         }
     }
 
-    pub fn update(&mut self, player_pos_buf: &Queue<Vec2<f32>>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) {
+    pub fn update(&mut self, player_pos: Vec2<f32>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) {
         match self.state {
-            BatState::Chase => {self.velocity = self.chase_player(player_pos_buf)},
-            BatState::Boid => {self.velocity = self.velocity * 1.01 + self.boid(player_pos_buf, boids_pos, boids_vel)}
+            BatState::Debug => {self.velocity = Vec2::new(0.0,0.0)},
+            BatState::Boid => {self.velocity = self.velocity * 1.01 + self.boid(player_pos, boids_pos, boids_vel)}
         }
         self.limit_speed();
         // self.boids_center = boids_center;
