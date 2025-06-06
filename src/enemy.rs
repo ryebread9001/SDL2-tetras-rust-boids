@@ -130,13 +130,14 @@ impl Enemy {
     }
 
     fn boids_towards_player(&self, player_pos: Vec2<f32>) -> Vec2<f32> {
-        let factor = 0.0065;
+        let mut factor = 0.0065;
         let distance_to_player = self.distance(&player_pos);
-        if distance_to_player < self.visual_range {
-            (player_pos - self.position) * factor
-        } else {
-            Vec2::new(0.0,0.0)
+        if distance_to_player > self.visual_range {
+            factor *= 0.2;
         }
+        let below_player: Vec2<f32> = Vec2::new(0.0, 15.0);
+        (player_pos + below_player - self.position) * factor
+
     }
 
     fn boids_in_range(&self, boids_pos: &Vec<Vec2<f32>>) -> Vec<Vec2<f32>> {

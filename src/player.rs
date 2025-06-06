@@ -21,15 +21,15 @@ pub struct Player {
     is_wall_jumping: bool,
     collision: bool,
     move_speed: f32,
-    restart_text: Text,
     score: u32
 }
 
 impl Player {
-    pub fn new(txts: Vec<Texture>, start_pos: Vec2<f32>, restart_text: Text) -> Player {
+    pub fn new(txts: Vec<Texture>, start_pos: Vec2<f32>) -> Player {
 
         let mut q = Queue::new(super::POSITION_BUFFER_SIZE);
         q.fill_with(start_pos);
+        
         Player {
             textures: txts,
             position: start_pos,
@@ -43,7 +43,6 @@ impl Player {
             is_wall_jumping: false,
             collision: false,
             move_speed: 1.2,
-            restart_text,
             score: 0
         }
     }
@@ -98,7 +97,7 @@ impl Player {
                     self.is_jumping = true;
                 } else {
                     self.is_jumping = false;
-                    self.position.y -= 0.1;
+                    self.position.y += 0.1;
                     self.is_wall_jumping = false;
                 }
             }
@@ -144,8 +143,8 @@ impl Player {
         }            
     }
 
-    fn token_collisions(&mut self, tokens: Vec<Token>) {
-        for token in &tokens {
+    fn token_collisions(&mut self, tokens: &mut Vec<Token>) {
+        for token in tokens {
             // formula for finding mean without some sample value, in this case, the current enemy boid pos
             // let center_minus_curr = ((n as f32 * center) - enemy.get_pos()) /  ((n - 1) as f32);
             let e_pos = token.get_pos();
@@ -153,7 +152,7 @@ impl Player {
 
             let mut hit_y = false;
             let mut hit_x = false;
-            // player-bat collision detection
+            // player-token collision detection
             let fut_x = self.position.x + self.velocity.x;
             if  fut_x >= e_pos.x + e_dim.x {
                 
@@ -181,6 +180,8 @@ impl Player {
             }
 
             if hit_x || hit_y {
+                println!("SET HIT");
+                token.set_hit(true);
                 if self.health > 0.0 {
                     self.health += 10.0;
                     self.score += 1;
@@ -192,14 +193,12 @@ impl Player {
         }            
     }
 
-    pub fn update(&mut self, ctx: &mut Context, platforms: Vec<Platform>, enemies: Vec<Enemy>, tokens: Vec<Token>) {
+    pub fn update(&mut self, ctx: &mut Context, platforms: Vec<Platform>, enemies: Vec<Enemy>, tokens: & mut Vec<Token>) {
 
         if self.position.y < WINDOW_HEIGHT as f32 + self.dimension.y {
             self.velocity.y += 0.75;
         } else {
-            if self.health > 0.0 {
-                self.health -= 2.5;
-            }
+            self.health = 0.0;
         }
         self.velocity.x *= 0.8;
 
@@ -229,6 +228,7 @@ impl Player {
 
         if input::is_key_pressed(ctx, Key::R) {
             self.health = 100.0;
+            self.score = 0;
             self.position = self.spawn_pos;
         }
 
@@ -248,7 +248,7 @@ impl Player {
         // println!("Player Health: {}", self.health);
     }
 
-    pub fn draw(&mut self, ctx: &mut Context) {
+    pub fn draw(&mut self, ctx: &mut Context) -> Result<(), Box<dyn std::error::Error>> {
 
         // LEFT RIGHT PLAYER TEXTURES
         if self.health > 0.0 {
@@ -269,9 +269,15 @@ impl Player {
                         .scale(Vec2::new(2.0, 2.0)),
                 );
             }
-        } else {
+        } else { // WOMP WOMP
             graphics::clear(ctx, Color::rgb(0.0, 0.0, 0.0));
-            self.restart_text.draw(ctx, Vec2::new(super::WINDOW_WIDTH as f32 /2.0 - 90.0, super::WINDOW_HEIGHT as f32 / 2.0 - 48.0))
+            let content = format!("     YOU DIED!\nPRESS \"R\" TO RESTART\n\n SCORE: {}", self.score);
+            let mut restart_text = Text::new(
+                content,
+                Font::bmfont(ctx, "./resources/DejaVuSansMono.fnt")?,
+            );
+            restart_text.draw(ctx, Vec2::new(super::WINDOW_WIDTH as f32 /2.0 - 90.0, super::WINDOW_HEIGHT as f32 / 2.0 - 48.0));
+            // self.score = 0;
         }
 
         // HEALTH BAR
@@ -282,16 +288,6 @@ impl Player {
                 .origin(Vec2::new(0.0,0.0))
                 .scale(Vec2::new(1.0, 1.0))
         );
+        Ok(())
     }
 }
-
-
-/* Platform Collision
-
-
- */
-
-/* enemy collision
-
-
-*/
