@@ -1,0 +1,6 @@
+[env]
+SDL2_LIB_DIR = "C:/vcpkg/installed/x64-windows/lib"
+SDL2_INCLUDE_DIR = "C:/vcpkg/installed/x64-windows/include"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-L", "native=C:/vcpkg/installed/x64-windows/lib"]

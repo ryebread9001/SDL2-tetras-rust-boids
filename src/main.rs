@@ -3,8 +3,10 @@ use player::Player;
 use platform::Platform;
 use rand::rngs::ThreadRng;
 use rand::{self, Rng};
+use tetra::graphics::mesh::{ShapeStyle, Mesh};
+use tetra::input::KeyLabel::S;
 use token::Token;
-use tetra::graphics::{self, Color, Texture};
+use tetra::graphics::{self, Color, Texture, Rectangle};
 use tetra::math::Vec2;
 use tetra::{Context, ContextBuilder, State};
 
@@ -14,21 +16,20 @@ pub mod enemy;
 pub mod token;
 pub mod game_object;
 pub mod queue;
-
-const PLATFORM_NUM: usize = 35;
-const ENEMY_NUM: usize = 40;
+const BACKGROUND_COLOR: Color = Color::rgb(245.0 / 255.0, 226.0 / 255.0, 210.0 / 255.0); //Color::rgb(0.769, 0.812, 0.631)
+const PLATFORM_NUM: usize = 45;
+const ENEMY_NUM: usize = 20;
 const TOKEN_NUM: usize = 10;
 const POSITION_BUFFER_SIZE: usize = 20;
-const BAT_VISUAL_RANGE: f32 = 100.0;
-const DOWN_SPEED_INITIAL: f32 = 0.4;
-pub const WINDOW_WIDTH: i32 = 640;
-pub const WINDOW_HEIGHT: i32 = 480;
-
-fn plat_pos_gen(rng: &mut ThreadRng) -> Vec2<f32> {
-    let x_pos = ((rng.gen::<f32>() * 9.41).floor()) * 68.0;
-    let y_pos = ((rng.gen::<f32>() * 12.97).floor()) * 37.0 + 37.0;
-    return Vec2::new(x_pos,y_pos);
-}
+const BAT_VISUAL_RANGE: f32 = 90.0;
+const DOWN_SPEED_INITIAL: f32 = 0.0;
+pub const PLATFORM_DIMENSIONS: Vec2<f32> = Vec2::new(68.0, 37.0);
+pub const PLATFORM_ACROSS: i32 = 16;
+pub const PLATFORM_DOWN: i32 = 16;
+pub const WINDOW_WIDTH: i32 = PLATFORM_DIMENSIONS.x as i32 * PLATFORM_ACROSS;
+pub const WINDOW_HEIGHT: i32 = PLATFORM_DIMENSIONS.y as i32 * PLATFORM_DOWN;
+pub const PLAYER_WIDTH: f32 = 32.0;
+pub const PLAYER_HEIGHT: f32 = 32.0;
 
 struct GameState {
     player: Player,
@@ -46,7 +47,12 @@ impl GameState {
         textures.push(Texture::new(ctx, "./resources/player.png")?);
         textures.push(Texture::new(ctx, "./resources/health.png")?);
         let start_pos = Vec2::new(32.0, 32.0);
-        let player = Player::new(textures, start_pos);
+        let simple: Mesh = Mesh::rectangle(
+            ctx,
+            ShapeStyle::Stroke(1.0),
+            Rectangle::new(0.0, 0.0, PLAYER_WIDTH, PLAYER_HEIGHT),
+        )?;
+        let player = Player::new(ctx, textures, start_pos, simple);
 
         let mut platforms = Vec::with_capacity(PLATFORM_NUM);
         let mut enemies = Vec::with_capacity(ENEMY_NUM);
@@ -54,15 +60,14 @@ impl GameState {
         let mut rng = rand::thread_rng();
         let mut next_available_id: u16 = 0;
 
-        let mut plat_pos_list: Vec<Vec2<f32>> = Vec::new();
-        for _ in 1..(PLATFORM_NUM + TOKEN_NUM) {
-            plat_pos_list.push(plat_pos_gen(&mut rng));
-        }
-
         // first platform under player
-        platforms.push(Platform::new(Texture::new(ctx, "./resources/platform.png")?, Vec2::new(78.0,50.0), false, Vec2::new(0.0, 148.0)));
+        platforms.push(Platform::new(Texture::new(ctx, "./resources/platform.png")?, PLATFORM_DIMENSIONS, false, Vec2::new(0.0, 148.0)));
+        
+        for plat_x in 0..PLATFORM_ACROSS {
+            platforms.push(Platform::new(Texture::new(ctx, "./resources/platform.png")?, PLATFORM_DIMENSIONS, false, Vec2::new((plat_x as f32) * PLATFORM_DIMENSIONS.x, PLATFORM_DIMENSIONS.y * (PLATFORM_DOWN - 1) as f32)));
+        }
         for _ in 1..PLATFORM_NUM {
-            platforms.push(Platform::new(Texture::new(ctx, "./resources/platform.png")?, Vec2::new(78.0,50.0), true, Vec2::new(0.0, 0.0)));
+            platforms.push(Platform::new(Texture::new(ctx, "./resources/platform.png")?, PLATFORM_DIMENSIONS, true, Vec2::new(0.0, 0.0)));
         }
 
         for _ in 0..TOKEN_NUM {
@@ -72,7 +77,6 @@ impl GameState {
         let mut bat_textures = Vec::new();
         bat_textures.push(Texture::new(ctx, "./resources/bat-l.png")?);
         bat_textures.push(Texture::new(ctx, "./resources/bat-r.png")?);
-        bat_textures.push(Texture::new(ctx, "./resources/wabbit_alpha.png")?);
 
         for _ in 0..ENEMY_NUM-1 {
             enemies.push(Enemy::new(next_available_id, bat_textures.clone(), Vec2::new(20.0,20.0), &mut rng, BAT_VISUAL_RANGE, false));
@@ -118,15 +122,17 @@ impl State for GameState {
         for i in 0..platforms.len() {
             platforms[i].update(self.down_speed);
         }
-        for i in 0..tokens.len() {
-            tokens[i].update(self.down_speed);
-        }
+
         let player_oldest_pos = player.oldest_player_pos();
         for j in 0..enemies.len() {
             enemies[j].update(player_oldest_pos, &boids_pos, &boids_vel)
         }
 
         player.update(ctx, platforms.clone(), enemies.clone(), tokens);
+
+        for i in 0..tokens.len() {
+            tokens[i].update(self.down_speed);
+        }
 
         // let mut pressed = input::get_keys_pressed(ctx).peekable();
         // if pressed.peek().is_some() {
@@ -148,7 +154,7 @@ impl State for GameState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> tetra::Result {
-        graphics::clear(ctx, Color::rgb(0.769, 0.812, 0.631));
+        graphics::clear(ctx, BACKGROUND_COLOR);
         
         for token in &self.tokens {
             token.draw(ctx);

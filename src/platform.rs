@@ -17,8 +17,8 @@ impl Platform {
     pub fn new(t: Texture, dim: Vec2<f32>, use_random: bool, pos: Vec2<f32>) -> Platform {
         let mut rng = rand::thread_rng();
         if use_random {
-            let x_pos = ((rng.gen::<f32>() * 9.41).floor()) * 68.0;
-            let y_pos = ((rng.gen::<f32>() * 12.97).floor()) * 37.0 + 37.0;
+            let x_pos = ((rng.gen::<f32>() * super::PLATFORM_ACROSS as f32).floor()) * super::PLATFORM_DIMENSIONS.x;
+            let y_pos = ((rng.gen::<f32>() * super::PLATFORM_DOWN as f32).floor()) * super::PLATFORM_DIMENSIONS.y + super::PLATFORM_DIMENSIONS.y;
             Platform {        
                 texture: t,
                 position: Vec2::new(x_pos,y_pos),

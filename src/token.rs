@@ -25,8 +25,6 @@ impl Token {
     pub fn new(t: Texture, dim: Vec2<f32>, use_random: bool, pos: Vec2<f32>) -> Token {
         let mut rng = rand::thread_rng();
         if use_random {
-            // let y_pos = ((rng.gen::<f32>() * 42.6).floor()) * 15.0;
-            // let x_pos = ((rng.gen::<f32>() * 30.0).floor()) * 16.0;
             let x_pos = ((rng.gen::<f32>() * x_rand).floor()) * x_multiplier + x_offset;
             let y_pos = ((rng.gen::<f32>() * y_rand).floor()) * y_multiplier + y_offset;
             Token {        
