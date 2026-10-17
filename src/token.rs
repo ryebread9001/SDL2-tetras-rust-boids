@@ -4,13 +4,11 @@ use tetra::Context;
 use rand::rngs::ThreadRng;
 use rand::{self, Rng};
 
-const x_multiplier: f32 = 72.0;
-const x_rand: f32 = 9.41;
-const x_offset: f32 = 18.5;
-const y_multiplier: f32 = 38.0;
-const y_rand: f32 = 12.97;
-const y_offset: f32 = 37.0;
-
+fn get_random_position(rng: &mut ThreadRng) -> Vec2<f32> {
+    let x_pos = ((rng.gen::<f32>() * super::PLATFORM_ACROSS as f32).floor()) * super::PLATFORM_DIMENSIONS.x + super::PLATFORM_DIMENSIONS.x / 2.0 - 7.5;
+    let y_pos = ((rng.gen::<f32>() * super::PLATFORM_DOWN as f32).floor()) * super::PLATFORM_DIMENSIONS.y + super::PLATFORM_DIMENSIONS.y / 2.0 - 8.0;
+    Vec2::new(x_pos, y_pos)
+}
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -25,11 +23,9 @@ impl Token {
     pub fn new(t: Texture, dim: Vec2<f32>, use_random: bool, pos: Vec2<f32>) -> Token {
         let mut rng = rand::thread_rng();
         if use_random {
-            let x_pos = ((rng.gen::<f32>() * x_rand).floor()) * x_multiplier + x_offset;
-            let y_pos = ((rng.gen::<f32>() * y_rand).floor()) * y_multiplier + y_offset;
             Token {        
                 texture: t,
-                position: Vec2::new(x_pos,y_pos),
+                position: get_random_position(&mut rng),
                 dimension: dim,     
                 rng: rng,
                 hit: false,
@@ -46,11 +42,7 @@ impl Token {
     }
 
     fn respawn(&mut self) {
-        // let y_pos = ((rng.gen::<f32>() * 42.6).floor()) * 15.0;
-        // let x_pos = ((rng.gen::<f32>() * 30.0).floor()) * 16.0;
-        self.position.x = ((self.rng.gen::<f32>() * x_rand).floor()) * x_multiplier + x_offset;
-        self.position.y -= super::WINDOW_HEIGHT as f32 - ((self.rng.gen::<f32>() * y_rand).floor()) * y_multiplier + y_offset;
-
+        self.position = get_random_position(&mut self.rng);
     }
 
     pub fn update(&mut self, down_speed: f32) {

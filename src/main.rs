@@ -18,10 +18,10 @@ pub mod game_object;
 pub mod queue;
 const BACKGROUND_COLOR: Color = Color::rgb(245.0 / 255.0, 226.0 / 255.0, 210.0 / 255.0); //Color::rgb(0.769, 0.812, 0.631)
 const PLATFORM_NUM: usize = 45;
-const ENEMY_NUM: usize = 20;
+const ENEMY_NUM: usize = 30;
 const TOKEN_NUM: usize = 10;
 const POSITION_BUFFER_SIZE: usize = 20;
-const BAT_VISUAL_RANGE: f32 = 90.0;
+const BAT_VISUAL_RANGE: f32 = 10.0;
 const DOWN_SPEED_INITIAL: f32 = 0.0;
 pub const PLATFORM_DIMENSIONS: Vec2<f32> = Vec2::new(68.0, 37.0);
 pub const PLATFORM_ACROSS: i32 = 16;
@@ -46,7 +46,7 @@ impl GameState {
         textures.push(Texture::new(ctx, "./resources/player-l.png")?);
         textures.push(Texture::new(ctx, "./resources/player.png")?);
         textures.push(Texture::new(ctx, "./resources/health.png")?);
-        let start_pos = Vec2::new(32.0, 32.0);
+        let start_pos = Vec2::new(WINDOW_WIDTH as f32 / 2.0, WINDOW_HEIGHT as f32 / 2.0);
         let simple: Mesh = Mesh::rectangle(
             ctx,
             ShapeStyle::Stroke(1.0),
@@ -79,11 +79,20 @@ impl GameState {
         bat_textures.push(Texture::new(ctx, "./resources/bat-r.png")?);
 
         for _ in 0..ENEMY_NUM-1 {
-            enemies.push(Enemy::new(next_available_id, bat_textures.clone(), Vec2::new(20.0,20.0), &mut rng, BAT_VISUAL_RANGE, false));
+            let triangle_mesh = Mesh::polygon(
+                ctx,
+                ShapeStyle::Fill,
+                &[
+                    Vec2::new(10.0, 0.0),    // Tip (pointing East / Right)
+                    Vec2::new(-10.0, -5.0), // Bottom Left
+                    Vec2::new(-10.0, 5.0),  // Bottom Right
+                ],
+            )?;
+            enemies.push(Enemy::new(next_available_id, bat_textures.clone(), triangle_mesh, Vec2::new(20.0,20.0), &mut rng, BAT_VISUAL_RANGE, false));
             next_available_id += 1;
         }
         // set debug to true for one bat's debug console out
-        enemies.push(Enemy::new(next_available_id, bat_textures.clone(), Vec2::new(20.0,20.0), &mut rng, BAT_VISUAL_RANGE, true));
+        //enemies.push(Enemy::new(next_available_id, bat_textures.clone(), Vec2::new(20.0,20.0), &mut rng, BAT_VISUAL_RANGE, true));
         
         let mut textures = Vec::new();
         textures.push(Texture::new(ctx, "./resources/player-l.png")?);
@@ -124,8 +133,9 @@ impl State for GameState {
         }
 
         let player_oldest_pos = player.oldest_player_pos();
+        let player_score = player.get_score();
         for j in 0..enemies.len() {
-            enemies[j].update(player_oldest_pos, &boids_pos, &boids_vel)
+            enemies[j].update(player_oldest_pos, player_score, &boids_pos, &boids_vel)
         }
 
         player.update(ctx, platforms.clone(), enemies.clone(), tokens);

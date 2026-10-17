@@ -1,5 +1,6 @@
 
-use tetra::graphics::{Texture, DrawParams};
+use tetra::graphics::{self, Color, Texture, DrawParams};
+use tetra::graphics::mesh::{Mesh, ShapeStyle};
 use tetra::math::Vec2;
 use tetra::Context;
 use rand::rngs::ThreadRng;
@@ -7,7 +8,10 @@ use rand::{self, Rng};
 use super::POSITION_BUFFER_SIZE;
 use super::queue::Queue;
 
+const BOID_COLOR: Color = Color::rgb(85.0 / 255.0, 26.0 / 255.0, 10.0 / 255.0); 
+
 #[derive(Debug, Clone)]
+
 
 enum BatState {
     Debug,
@@ -17,6 +21,7 @@ enum BatState {
 pub struct Enemy {
     id: u16,
     textures: Vec<Texture>,
+    triangle_mesh: Mesh,
     position: Vec2<f32>,
     velocity: Vec2<f32>,
     dimension: Vec2<f32>,
@@ -28,15 +33,19 @@ pub struct Enemy {
 }
 
 impl Enemy {
-    pub fn new(id: u16, ts: Vec<Texture>, dim: Vec2<f32>, rng: &mut ThreadRng, visual_range: f32, debug: bool) -> Enemy {
-        let x_pos = rng.gen::<f32>() * 640.0;
-        let y_pos = rng.gen::<f32>() * 480.0 - 200.0;
+    pub fn new(id: u16, ts: Vec<Texture>, triangle_mesh: Mesh, dim: Vec2<f32>, rng: &mut ThreadRng, visual_range: f32, debug: bool) -> Enemy {
+        let x_pos = rng.gen::<f32>() * super::WINDOW_WIDTH as f32;
+        let y_pos = rng.gen::<f32>() * super::WINDOW_HEIGHT as f32 - 100.0;
+
+        let random_velocity_x = rng.gen_range(-3.0..3.0);
+        let random_velocity_y = rng.gen_range(-3.0..3.0);
 
         Enemy {     
             id,
             textures: ts,
+            triangle_mesh: triangle_mesh,
             position: Vec2::new(x_pos,y_pos),
-            velocity: Vec2::new(0.0,0.0),
+            velocity: Vec2::new(random_velocity_x, random_velocity_y),
             dimension: dim,
             is_facing_left: true,
             state: BatState::Boid,
@@ -76,9 +85,9 @@ impl Enemy {
         ((self.position.x - b.x).powi(2) + (self.position.y - b.y).powi(2)).sqrt()
     }
 
-    fn rule2(&self, boids_pos: &Vec<Vec2<f32>>) -> Vec2<f32> {
+    fn rule2(&self, boids_pos: &Vec<Vec2<f32>>, player_score: u32) -> Vec2<f32> {
         let distance: f32 = 15.0;
-        let avoid = 0.005;
+        let avoid = 0.09 + (player_score as f32 / 50.0); //0.005;
         let mut result:Vec2<f32> = Vec2::new(0.0,0.0);
         for b in boids_pos {
             let distance_from = self.distance(b);
@@ -129,11 +138,11 @@ impl Enemy {
         result
     }
 
-    fn boids_towards_player(&self, player_pos: Vec2<f32>) -> Vec2<f32> {
-        let mut factor = 0.0065;
+    fn boids_towards_player(&self, player_pos: Vec2<f32>, player_score: u32) -> Vec2<f32> {
+        let mut factor = 0.0055 + (player_score as f32 / 100.0);
         let distance_to_player = self.distance(&player_pos);
         if distance_to_player > self.visual_range {
-            factor *= 0.2;
+            factor *= 0.005; //0.2
         }
         let below_player: Vec2<f32> = Vec2::new(0.0, 15.0);
         (player_pos + below_player - self.position) * factor
@@ -159,14 +168,15 @@ impl Enemy {
         // }
     }
 
-    fn boid(&mut self, player_pos_buf: Vec2<f32>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) -> Vec2<f32> {
+    fn boid(&mut self, player_pos_buf: Vec2<f32>, player_score: u32, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) -> Vec2<f32> {
+        self.visual_range = 10.0 + (player_score as f32);
         let boids_seen = self.boids_in_range(boids_pos);
         self.calculate_center(&boids_seen);
         let mut new_vel: Vec2<f32> = Vec2 { x: (0.0), y: (0.0) };
 
-        let towards_player = self.boids_towards_player(player_pos_buf);
+        let towards_player = self.boids_towards_player(player_pos_buf, player_score);
         let rule1 = self.rule1(); // towards boids center
-        let rule2 = self.rule2(boids_pos); // avoid others
+        let rule2 = self.rule2(boids_pos, player_score); // avoid others
         let rule3 = self.rule3(boids_vel); // match speed
         let stay_inside = self.stay_within_window();
 
@@ -187,10 +197,10 @@ impl Enemy {
         }
     }
 
-    pub fn update(&mut self, player_pos: Vec2<f32>, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) {
+    pub fn update(&mut self, player_pos: Vec2<f32>, player_score: u32, boids_pos: &Vec<Vec2<f32>>, boids_vel: &Vec<Vec2<f32>>) {
         match self.state {
             BatState::Debug => {self.velocity = Vec2::new(0.0,0.0)},
-            BatState::Boid => {self.velocity = self.velocity * 1.01 + self.boid(player_pos, boids_pos, boids_vel)}
+            BatState::Boid => {self.velocity = self.velocity * 1.01 + self.boid(player_pos, player_score, boids_pos, boids_vel)}
         }
         self.limit_speed();
         // self.boids_center = boids_center;
@@ -206,17 +216,25 @@ impl Enemy {
     }
 
     pub fn draw(&self, ctx: &mut Context) {
-        if self.is_facing_left {
-            self.textures[0].draw(ctx, DrawParams::new()
+        let angle = self.velocity.y.atan2(self.velocity.x);
+        self.triangle_mesh.draw(ctx, DrawParams::new()
             .position(self.position)
-            .origin(Vec2::new(8.0, 8.0))
-            .scale(Vec2::new(2.0, 2.0)),);
-        } else {
-            self.textures[1].draw(ctx, DrawParams::new()
-            .position(self.position)
-            .origin(Vec2::new(8.0, 8.0))
-            .scale(Vec2::new(2.0, 2.0)),);
-        }
+            .origin(Vec2::new(0.0, 0.0))
+            .scale(Vec2::new(1.0, 1.0))
+            .rotation(angle)
+            .color(BOID_COLOR),);
+
+        // if self.is_facing_left {
+        //     self.textures[0].draw(ctx, DrawParams::new()
+        //     .position(self.position)
+        //     .origin(Vec2::new(8.0, 8.0))
+        //     .scale(Vec2::new(2.0, 2.0)),);
+        // } else {
+        //     self.textures[1].draw(ctx, DrawParams::new()
+        //     .position(self.position)
+        //     .origin(Vec2::new(8.0, 8.0))
+        //     .scale(Vec2::new(2.0, 2.0)),);
+        // }
 
         // draws percieved center for debugging
         // if self.debug {

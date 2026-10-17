@@ -66,6 +66,10 @@ impl Player {
         }
     }
 
+    pub fn get_score(&self) -> u32 {
+        self.score
+    }
+
     fn window_collision(&mut self) {
         if self.position.x < 0.0 {
             self.position.x = 0.0;
