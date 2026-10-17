@@ -219,7 +219,6 @@ impl Player {
                 println!("SET HIT");
                 token.set_hit(true);
                 if self.health > 0.0 {
-                    self.health += 10.0;
                     self.score += 1;
                 }
                 if self.health > 100.0 {

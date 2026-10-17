@@ -141,7 +141,7 @@ impl State for GameState {
         player.update(ctx, platforms.clone(), enemies.clone(), tokens);
 
         for i in 0..tokens.len() {
-            tokens[i].update(self.down_speed);
+            tokens[i].update(platforms.clone());
         }
 
         // let mut pressed = input::get_keys_pressed(ctx).peekable();
